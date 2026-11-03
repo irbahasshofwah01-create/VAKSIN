@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VAKSIN – Validasi Fakta Saring Informasi Nyata</title>
+<meta name="description" content="Platform penyaring hoaks vaksin: Validasi Fakta Saring Informasi Nyata.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💉</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['"Plus Jakarta Sans"','system-ui','sans-serif']}}}}</script>
+<script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
+<script src="https://unpkg.com/lucide@0.263.1/dist/umd/lucide.min.js"></script>
+<style>
+html{scroll-behavior:smooth}
+body{background:#FDFBF7}
+@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}
+.pop{animation:pop .45s ease both}
+@keyframes toast{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.toast{animation:toast .35s ease both}
+</style>
+</head>
+<body class="font-sans text-slate-800 antialiased">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ---------- Icon (Lucide) ---------- */
+function Icon({ name, className = "w-5 h-5" }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.innerHTML = `<i data-lucide="${name}"></i>`;
+    lucide.createIcons({ attrs: { class: className } });
+  }, [name, className]);
+  return <span ref={ref} className="inline-flex items-center justify-center shrink-0" />;
+}
+
+/* ---------- Data ---------- */
+const HOAX_KEYS = ["chip", "bahaya", "kemandulan", "mandul", "autisme", "dosis", "magnet", "dajjal", "mati", "5g"];
+const FACT_KEYS = ["bpom", "halal", "manfaat", "booster", "aman", "mui", "efektif", "kemenkes"];
+
+const HOAX_RESULT = {
+  chip: "Tidak ada chip, mikrochip, maupun pelacak dalam vaksin. Vaksin hanya berisi antigen, penstabil, dan pengawet yang diuji ketat. Ukuran jarum suntik pun terlalu kecil untuk memuat perangkat elektronik.",
+  mandul: "Tidak ada bukti ilmiah bahwa vaksin menyebabkan kemandulan. Studi besar menunjukkan vaksin tidak memengaruhi kesuburan pria maupun wanita.",
+  autisme: "Hubungan vaksin dengan autisme sudah dibantah oleh puluhan studi berskala besar. Studi asal klaim ini telah ditarik oleh jurnalnya karena cacat metodologi.",
+  dosis: "Jumlah dan jarak dosis vaksin ditetapkan berdasarkan uji klinis dan rekomendasi ahli (ITAGI/WHO). Dosis lengkap diperlukan agar perlindungan optimal.",
+  default: "Klaim ini bertentangan dengan bukti ilmiah. Vaksin yang beredar di Indonesia telah melewati uji klinis bertahap dan izin edar BPOM. Efek samping umumnya ringan dan sementara."
+};
+const FACT_RESULT = "Vaksin yang digunakan di Indonesia telah mendapat izin edar BPOM, fatwa kehalalan MUI untuk produk tertentu, serta rekomendasi Kemenkes dan WHO. Dosis lanjutan (booster) terbukti memperkuat perlindungan terutama pada kelompok rentan.";
+
+const TRENDS = [
+  { t: "Vaksin mengandung microchip untuk melacak penerimanya", src: "Viral di grup WhatsApp keluarga", a: "Tidak benar. Menurut Kemenkes dan WHO, vaksin tidak mengandung chip atau komponen elektronik apa pun. Komposisinya hanya antigen, penstabil, dan bahan pendukung yang diawasi BPOM." },
+  { t: "Vaksin menyebabkan kemandulan permanen pada remaja", src: "Pesan berantai media sosial", a: "Tidak benar. Tidak ada bukti ilmiah yang menghubungkan vaksin dengan gangguan kesuburan. WHO dan berbagai organisasi kedokteran menegaskan vaksin aman bagi kesehatan reproduksi." },
+  { t: "Imunisasi anak menyebabkan autisme", src: "Beredar di Facebook & TikTok", a: "Tidak benar. Puluhan studi dengan jutaan anak tidak menemukan hubungan antara imunisasi dan autisme. Tidak imunisasi justru membuat anak rentan terhadap campak, polio, dan difteri." }
+];
+
+const QUIZ = {
+  q: "“Vaksin yang sudah mendapat izin edar BPOM telah melalui uji klinis dan pengawasan keamanan.”",
+  ans: true,
+  why: "FAKTA. Sebelum izin edar diberikan, BPOM mengevaluasi data mutu, keamanan, dan khasiat dari uji klinis. Pengawasan tetap berlanjut setelah vaksin beredar."
+};
+
+/* ---------- Components ---------- */
+function Navbar({ goReport }) {
+  const [open, setOpen] = useState(false);
+  const links = [["cek", "Cek Fakta"], ["tren", "Tren Hoaks"], ["edukasi", "Edukasi"], ["lapor", "Lapor"]];
+  return (
+    <header className="sticky top-0 z-40 bg-[#FDFBF7]/90 backdrop-blur border-b border-amber-100">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <a href="#cek" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow"><Icon name="shield-check" /></div>
+          <div className="leading-tight">
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-extrabold tracking-tight"><span className="text-blue-700">VAK</span><span className="text-rose-600">SIN</span></span>
+              <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Beta / Inovasi</span>
+            </div>
+            <p className="text-[10px] sm:text-xs text-slate-500">Validasi Fakta Saring Informasi Nyata</p>
+          </div>
+        </a>
+        <nav className="hidden md:flex items-center gap-1">
+          {links.map(([id, l]) => <a key={id} href={"#" + id} className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-blue-700 hover:bg-blue-50 transition">{l}</a>)}
+        </nav>
+        <div className="flex items-center gap-2">
+          <button onClick={goReport} className="hidden sm:inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow transition">
+            <Icon name="megaphone" className="w-4 h-4" /> Aksi Nyata
+          </button>
+          <button onClick={() => setOpen(!open)} className="md:hidden p-2 rounded-lg hover:bg-amber-100" aria-label="Menu"><Icon name={open ? "x" : "menu"} /></button>
+        </div>
+      </div>
+      {open && (
+        <div className="md:hidden px-4 pb-4 flex flex-col gap-1 pop">
+          {links.map(([id, l]) => <a key={id} href={"#" + id} onClick={() => setOpen(false)} className="px-3 py-2 rounded-lg font-semibold hover:bg-blue-50">{l}</a>)}
+          <button onClick={() => { setOpen(false); goReport(); }} className="mt-1 bg-rose-600 text-white font-bold px-4 py-2.5 rounded-xl">Aksi Nyata</button>
+        </div>
+      )}
+    </header>
+  );
+}
+
+function Result({ r }) {
+  if (r.type === "hoax") return (
+    <div className="pop mt-6 text-left bg-white rounded-2xl border-2 border-rose-200 shadow-lg overflow-hidden">
+      <div className="bg-rose-600 text-white px-5 py-3 flex items-center gap-2 font-extrabold"><Icon name="x-circle" /> STATUS: HOAKS</div>
+      <div className="p-5">
+        <div className="flex items-center justify-between text-sm font-semibold mb-1"><span>Skor Kepalsuan</span><span className="text-rose-600">{r.score}%</span></div>
+        <div className="h-3 bg-rose-100 rounded-full overflow-hidden"><div className="h-full bg-rose-500 rounded-full transition-all duration-1000" style={{ width: r.score + "%" }} /></div>
+        <h4 className="font-bold mt-4 mb-1 flex items-center gap-2"><Icon name="stethoscope" className="w-4 h-4 text-blue-600" /> Penjelasan Medis yang Benar</h4>
+        <p className="text-slate-600 text-sm leading-relaxed">{r.text}</p>
+        <p className="text-xs text-slate-400 mt-3">Rujukan: Kemenkes RI · WHO · Turn Back Hoax (Mafindo)</p>
+      </div>
+    </div>
+  );
+  if (r.type === "fact") return (
+    <div className="pop mt-6 text-left bg-white rounded-2xl border-2 border-emerald-200 shadow-lg overflow-hidden">
+      <div className="bg-emerald-600 text-white px-5 py-3 flex items-center gap-2 font-extrabold"><Icon name="badge-check" /> STATUS: FAKTA VALID</div>
+      <div className="p-5">
+        <div className="flex items-center justify-between text-sm font-semibold mb-1"><span>Tingkat Kebenaran</span><span className="text-emerald-600">{r.score}%</span></div>
+        <div className="h-3 bg-emerald-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: r.score + "%" }} /></div>
+        <p className="text-slate-600 text-sm leading-relaxed mt-4">{r.text}</p>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {["BPOM RI", "Kemenkes RI", "MUI", "WHO"].map(s => <span key={s} className="text-xs font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">{s}</span>)}
+        </div>
+      </div>
+    </div>
+  );
+  return (
+    <div className="pop mt-6 text-left bg-white rounded-2xl border-2 border-amber-200 shadow-lg p-5">
+      <div className="font-extrabold text-amber-600 flex items-center gap-2 mb-1"><Icon name="alert-triangle" /> STATUS: BELUM TERVERIFIKASI</div>
+      <p className="text-sm text-slate-600">Klaim ini belum ada di basis data kami. Jangan sebarkan dulu. Periksa di situs resmi Kemenkes, WHO, atau laporkan lewat formulir di bawah.</p>
+    </div>
+  );
+}
+
+function Hero({ onToast }) {
+  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [res, setRes] = useState(null);
+  const check = (e) => {
+    e.preventDefault();
+    if (!q.trim()) { onToast("Masukkan klaim atau tautan berita terlebih dahulu.", "warn"); return; }
+    setLoading(true); setRes(null);
+    setTimeout(() => {
+      const s = q.toLowerCase();
+      const hk = HOAX_KEYS.find(k => s.includes(k));
+      const fk = FACT_KEYS.find(k => s.includes(k));
+      if (hk) setRes({ type: "hoax", score: 90 + Math.floor(Math.random() * 9), text: HOAX_RESULT[hk] || HOAX_RESULT.default });
+      else if (fk) setRes({ type: "fact", score: 94 + Math.floor(Math.random() * 5), text: FACT_RESULT });
+      else setRes({ type: "unknown" });
+      setLoading(false);
+    }, 1000);
+  };
+  return (
+    <section id="cek" className="relative overflow-hidden">
+      <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-200/40 rounded-full blur-3xl" />
+      <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-rose-200/40 rounded-full blur-3xl" />
+      <div className="relative max-w-3xl mx-auto px-4 pt-14 pb-12 text-center">
+        <span className="inline-flex items-center gap-2 text-xs font-bold bg-white border border-blue-100 text-blue-700 px-3 py-1.5 rounded-full shadow-sm"><Icon name="sparkles" className="w-3.5 h-3.5" /> Vaksin: Validasi Fakta dan Aksi Nyata</span>
+        <h1 className="mt-5 text-3xl sm:text-5xl font-extrabold leading-tight tracking-tight">
+          <span className="text-blue-700">Validasi Fakta</span>, <span className="text-rose-600">Saring Informasi Nyata</span> Sebelum Menyebarkan.
+        </h1>
+        <p className="mt-4 text-slate-600 text-base sm:text-lg">Platform cerdas untuk memverifikasi rumor, berita, dan pesan berantai seputar vaksin secara akurat dan cepat.</p>
+        <form onSubmit={check} className="mt-8 bg-white p-3 rounded-2xl shadow-xl border border-amber-100">
+          <textarea value={q} onChange={e => setQ(e.target.value)} rows={3} placeholder="Tempel klaim atau link berita di sini. Contoh: “Vaksin mengandung chip pelacak”"
+            className="w-full resize-none p-3 rounded-xl bg-amber-50/60 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base transition" />
+          <button disabled={loading} className="mt-3 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-rose-600 active:scale-[.98] disabled:opacity-70 text-white font-bold py-3.5 rounded-xl shadow transition-all">
+            {loading ? <><span className="animate-spin"><Icon name="loader-2" /></span> Menganalisis data...</> : <><Icon name="search" /> Cek Fakta Now</>}
+          </button>
+          <div className="flex flex-wrap gap-2 mt-3 justify-center">
+            {["vaksin mengandung chip", "booster aman dan halal?", "vaksin sebabkan autisme"].map(x => (
+              <button type="button" key={x} onClick={() => setQ(x)} className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 px-3 py-1.5 rounded-full font-semibold transition">{x}</button>
+            ))}
+          </div>
+        </form>
+        {res && <Result r={res} />}
+      </div>
+    </section>
+  );
+}
+
+function Counter({ end, suffix, label, icon }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let cur = 0; const step = end / 60;
+    const id = setInterval(() => { cur += step; if (cur >= end) { cur = end; clearInterval(id); } setN(Math.round(cur)); }, 25);
+    return () => clearInterval(id);
+  }, [end]);
+  return (
+    <div className="bg-white rounded-2xl p-6 shadow-md border-b-4 border-blue-600 hover:-translate-y-1 hover:shadow-xl transition flex items-center gap-4">
+      <div className="w-12 h-12 rounded-xl bg-amber-100 text-blue-700 flex items-center justify-center"><Icon name={icon} className="w-6 h-6" /></div>
+      <div><div className="text-2xl sm:text-3xl font-extrabold text-blue-700">{n.toLocaleString("en-US")}{suffix}</div><div className="text-sm text-slate-500 font-medium">{label}</div></div>
+    </div>
+  );
+}
+
+function Stats() {
+  return (
+    <section className="max-w-6xl mx-auto px-4 grid sm:grid-cols-3 gap-4">
+      <Counter end={1240} suffix="+" label="Informasi Terverifikasi" icon="file-check" />
+      <Counter end={98} suffix="%" label="Tingkat Akurasi" icon="target" />
+      <Counter end={15000} suffix="+" label="Pengguna Terlindungi" icon="users" />
+    </section>
+  );
+}
+
+function Tracker() {
+  const [open, setOpen] = useState(null);
+  return (
+    <section id="tren" className="max-w-6xl mx-auto px-4 pt-20 scroll-mt-20">
+      <h2 className="text-2xl sm:text-3xl font-extrabold">Rumor & Hoaks Populer <span className="text-rose-600">Minggu Ini</span></h2>
+      <p className="text-slate-500 mt-1">Pesan yang paling sering beredar di WhatsApp dan media sosial.</p>
+      <div className="grid md:grid-cols-3 gap-5 mt-8 items-start">
+        {TRENDS.map((h, i) => (
+          <article key={i} className="bg-white rounded-2xl shadow-md p-5 border border-amber-100 hover:shadow-xl transition">
+            <span className="inline-flex items-center gap-1 -rotate-2 border-2 border-rose-500 text-rose-600 font-extrabold text-xs px-2.5 py-1 rounded-md tracking-widest"><Icon name="ban" className="w-3.5 h-3.5" /> HOAKS</span>
+            <h3 className="font-bold text-lg mt-3 leading-snug">“{h.t}”</h3>
+            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1"><Icon name="message-circle" className="w-3.5 h-3.5" /> {h.src}</p>
+            <button onClick={() => setOpen(open === i ? null : i)} className="mt-4 w-full flex items-center justify-between bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-sm px-4 py-2.5 rounded-xl transition">
+              Buka Fakta Sebenarnya <Icon name="chevron-down" className={"w-4 h-4 transition-transform " + (open === i ? "rotate-180" : "")} />
+            </button>
+            {open === i && (
+              <div className="pop mt-3 text-sm text-slate-600 leading-relaxed bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+                <div className="font-bold text-emerald-700 flex items-center gap-1 mb-1"><Icon name="badge-check" className="w-4 h-4" /> Fakta Ilmiah</div>
+                {h.a}
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Quiz() {
+  const [pick, setPick] = useState(null);
+  const done = pick !== null;
+  const correct = done && pick === QUIZ.ans;
+  const Btn = ({ val, label, cls }) => (
+    <button disabled={done} onClick={() => setPick(val)}
+      className={"flex-1 py-3.5 rounded-xl font-extrabold text-white transition active:scale-95 " + (done ? (val === QUIZ.ans ? "bg-emerald-600 ring-4 ring-emerald-200" : pick === val ? "bg-rose-600 ring-4 ring-rose-200" : "bg-slate-300") : cls)}>{label}</button>
+  );
+  return (
+    <section id="edukasi" className="max-w-3xl mx-auto px-4 pt-20 scroll-mt-20">
+      <div className="bg-white rounded-3xl shadow-xl border border-amber-100 p-6 sm:p-8">
+        <div className="flex items-center gap-2 text-blue-700 font-bold text-sm"><Icon name="graduation-cap" /> KLINIK LITERASI</div>
+        <h2 className="text-2xl font-extrabold mt-1">Uji Literasi Digitalmu</h2>
+        <p className="text-slate-500 text-sm mt-1">Apakah klaim berikut FAKTA atau HOAKS?</p>
+        <blockquote className="mt-5 bg-amber-50 border-l-4 border-blue-600 rounded-r-xl p-4 font-semibold">{QUIZ.q}</blockquote>
+        <div className="flex gap-3 mt-5">
+          <Btn val={true} label="FAKTA" cls="bg-blue-600 hover:bg-blue-700" />
+          <Btn val={false} label="HOAKS" cls="bg-rose-600 hover:bg-rose-700" />
+        </div>
+        {done && (
+          <div className={"pop mt-5 rounded-xl p-4 text-sm leading-relaxed border " + (correct ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-rose-50 border-rose-200 text-rose-800")}>
+            <div className="font-extrabold flex items-center gap-2 mb-1"><Icon name={correct ? "party-popper" : "x-circle"} className="w-4 h-4" /> {correct ? "Benar! Kamu cermat." : "Belum tepat, yuk belajar lagi."}</div>
+            {QUIZ.why}
+            <button onClick={() => setPick(null)} className="block mt-3 font-bold underline">Coba lagi</button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Report({ onToast }) {
+  const [txt, setTxt] = useState("");
+  const submit = (e) => {
+    e.preventDefault();
+    if (!txt.trim()) return;
+    setTxt("");
+    onToast("Terima kasih! Laporan Anda telah masuk ke tim verifikasi VAKSIN.");
+  };
+  const share = async () => {
+    const msg = "⚠️ Sebelum menyebarkan info vaksin, cek dulu faktanya!\n1. Siapa sumbernya?\n2. Adakah rujukan Kemenkes/WHO/BPOM?\n3. Cek di VAKSIN: Validasi Fakta Saring Informasi Nyata.\n#SaringSebelumSharing";
+    try {
+      if (navigator.share) await navigator.share({ title: "VAKSIN", text: msg });
+      else { await navigator.clipboard.writeText(msg); onToast("Template anti-hoaks disalin. Tempel di grup keluargamu!"); }
+    } catch (e) {}
+  };
+  return (
+    <section id="lapor" className="max-w-6xl mx-auto px-4 pt-20 pb-20 scroll-mt-20">
+      <div className="grid md:grid-cols-2 gap-6">
+        <form onSubmit={submit} className="bg-white rounded-3xl shadow-xl border border-amber-100 p-6 sm:p-8">
+          <div className="flex items-center gap-2 text-rose-600 font-bold text-sm"><Icon name="flag" /> LAPOR HOAKS</div>
+          <h2 className="text-2xl font-extrabold mt-1">Temukan hoaks di grup keluarga?</h2>
+          <p className="text-slate-500 text-sm mt-1">Tempel tautan atau teksnya, tim kami akan memverifikasinya.</p>
+          <textarea value={txt} onChange={e => setTxt(e.target.value)} required rows={5} placeholder="Tempel link atau teks hoaks di sini..."
+            className="mt-4 w-full p-3 rounded-xl bg-amber-50/60 focus:bg-white outline-none focus:ring-2 focus:ring-rose-400 text-sm resize-none transition" />
+          <button className="mt-3 w-full flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold py-3.5 rounded-xl shadow transition"><Icon name="send" className="w-4 h-4" /> Kirim Laporan</button>
+        </form>
+        <div className="bg-gradient-to-br from-blue-700 to-blue-900 text-white rounded-3xl shadow-xl p-6 sm:p-8 flex flex-col">
+          <div className="flex items-center gap-2 text-blue-200 font-bold text-sm"><Icon name="heart-pulse" /> PUSAT AKSI NYATA</div>
+          <h2 className="text-2xl font-extrabold mt-1">Dari fakta, menjadi aksi.</h2>
+          <p className="text-blue-100 text-sm mt-2">Setelah memastikan faktanya, lindungi diri dan keluargamu, lalu ajak orang terdekat.</p>
+          <div className="mt-6 flex flex-col gap-3 mt-auto">
+            <a href="https://www.google.com/maps/search/puskesmas+vaksinasi+terdekat" target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 bg-white text-blue-800 hover:bg-amber-50 font-bold py-3.5 rounded-xl transition active:scale-95"><Icon name="map-pin" className="w-5 h-5" /> Cari Lokasi Vaksin Terdekat</a>
+            <button onClick={share} className="flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 font-bold py-3.5 rounded-xl transition active:scale-95"><Icon name="share-2" className="w-5 h-5" /> Bagikan Template Anti-Hoaks</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="bg-blue-950 text-blue-100">
+      <div className="max-w-6xl mx-auto px-4 py-10 grid md:grid-cols-2 gap-8">
+        <div>
+          <div className="text-2xl font-extrabold"><span className="text-white">VAK</span><span className="text-rose-400">SIN</span></div>
+          <p className="text-sm mt-1 text-blue-300">Validasi Fakta Saring Informasi Nyata</p>
+          <p className="text-xs mt-4 text-blue-300 leading-relaxed">Disclaimer: Website ini dibuat sebagai prototipe proyek inovasi lomba infografis bertema “Vaksin: Validasi Fakta dan Aksi Nyata”. Hasil pemeriksaan bersifat simulasi edukatif dan bukan pengganti nasihat tenaga kesehatan.</p>
+        </div>
+        <div>
+          <h3 className="font-bold text-white mb-2">Rujukan Sumber Terpercaya</h3>
+          <ul className="text-sm space-y-1.5">
+            <li><a className="hover:text-white underline underline-offset-2" href="https://www.who.int" target="_blank" rel="noopener noreferrer">WHO – World Health Organization</a></li>
+            <li><a className="hover:text-white underline underline-offset-2" href="https://www.kemkes.go.id" target="_blank" rel="noopener noreferrer">Kemenkes RI</a></li>
+            <li><a className="hover:text-white underline underline-offset-2" href="https://turnbackhoax.id" target="_blank" rel="noopener noreferrer">Mafindo – TurnBackHoax.id</a></li>
+          </ul>
+        </div>
+      </div>
+      <div className="border-t border-blue-900 text-center text-xs text-blue-400 py-4">© {new Date().getFullYear()} VAKSIN · Proyek Inovasi Lomba Infografis. Seluruh hak cipta dilindungi.</div>
+    </footer>
+  );
+}
+
+function Toast({ t }) {
+  if (!t) return null;
+  const warn = t.kind === "warn";
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-md toast">
+      <div className={"flex items-start gap-3 text-white rounded-2xl shadow-2xl p-4 " + (warn ? "bg-amber-600" : "bg-emerald-600")}>
+        <Icon name={warn ? "alert-triangle" : "check-circle"} className="w-5 h-5 mt-0.5" />
+        <p className="text-sm font-semibold">{t.msg}</p>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, kind = "ok") => { setToast({ msg, kind }); setTimeout(() => setToast(null), 3500); };
+  const goReport = () => document.getElementById("lapor").scrollIntoView({ behavior: "smooth" });
+  return (
+    <>
+      <Navbar goReport={goReport} />
+      <main>
+        <Hero onToast={showToast} />
+        <Stats />
+        <Tracker />
+        <Quiz />
+        <Report onToast={showToast} />
+      </main>
+      <Footer />
+      <Toast t={toast} />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
